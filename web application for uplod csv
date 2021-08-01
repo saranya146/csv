@@ -1,0 +1,81 @@
+'''
+Create a web application with an option to upload a CSV file of 1 lakh or more records,
+where the application should read the records, process it, and push to the database table.
+The CSV file will have a header row that denotes the database table column names and rows
+which represent the values of the database table.
+After the upload of the CSV file, only the database table should be created dynamically
+based on the header names of the CSV file and the insert of row values should be carried
+out later.
+In case if there are any header named as “password”, the value should be encrypted
+dynamically and saved in the database.
+'''
+solution:
+
+from flask import Flask, render_template, request, redirect, url_for
+import os
+from os.path import join, dirname, realpath
+
+import pandas as pd
+import mysql.connector
+
+app = Flask(__name__)
+
+# enable debugging mode
+app.config["DEBUG"] = True
+
+# Upload folder
+UPLOAD_FOLDER = 'static/files'
+app.config['UPLOAD_FOLDER'] =  UPLOAD_FOLDER
+
+
+# Database
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="root",
+  password="root",
+  database="csvfile"
+)
+
+mycursor = mydb.cursor()
+
+mycursor.execute("SHOW DATABASES")
+
+# View All Database
+for x in mycursor:
+  print(x)
+
+# Root URL
+@app.route('/')
+def index():
+     # Set The upload HTML template '\templates\index.html'
+    return render_template('index.html')
+
+
+# Get the uploaded files
+@app.route("/", methods=['POST'])
+def uploadFiles():
+      # get the uploaded file
+      uploaded_file = request.files['file']
+      if uploaded_file.filename != '':
+           file_path = os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)
+          # set the file path
+           uploaded_file.save(file_path)
+           parseCSV(file_path)
+          # save the file
+      return redirect(url_for('index'))
+
+def parseCSV(filePath):
+      # CVS Column Names
+      attributes = ['roll_no','stu_name','Tamil','English','Maths', 'Science', 'Social' , 'Total']
+      # Use Pandas to parse the CSV file
+      csvInfo= pd.read_csv(filePath,names=attributes, header=None)
+      # Loop through the Rows
+      for i,row in csvInfo.iterrows():
+             sql = "INSERT INTO addresses ('roll_no','stu_name','Tamil','English','Maths', 'Science', 'Social' ,'Total') VALUES (%d, %s, %d, %d, %d, %d,%d,%d)"
+             value = (row['roll_no'],row['stu_name'],row['Tamil'],row['English'],row['Maths'],row['Science'],row['Social'],row['Total'])
+             mycursor.execute(sql, value, if_exists='append')
+             mydb.commit()
+             print(i,row['first_name'],row['last_name'],row['address'],row['street'],row['state'],row['zip'])
+
+if (__name__ == "__main__"):
+     app.run(port = 5000)
